@@ -8,6 +8,7 @@ from colorama import Fore, init
 import re
 from collections import deque
 import base64
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # ----------------- Banner -----------------
 def print_banner():
@@ -31,10 +32,30 @@ start_time = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 # ----------------- KONFIGURASI YESCAPTCHA -----------------
 YESCAPTCHA_CLIENT_KEY = "4833cd9be06f143f76fc531a5312404bbdb09dc0100535"
 
-# ----------------- PENGATURAN OTOMATIS (CLOUD/VPS) -----------------
-# ⚠️ SILAKAN UBAH DUA BAGIAN DI BAWAH INI SEBELUM DI-UPLOAD KE GITHUB
-channel_id = "1502243644281720933"   # <-- Ganti dengan ID Channel Discord kamu (tetap gunakan tanda kutip)
-waktu2 = 1300                                      # <-- Jeda kirim pesan dalam milidetik (contoh: 5000 artinya 5 detik)
+# ----------------- PENGATURAN OTOMATIS CLOUD -----------------
+# ⚠️ SILAKAN UBAH ID CHANNEL DI BAWAH INI
+channel_id = "1502243644281720933"   # <-- Ganti dengan ID Channel Discord kamu
+waktu2 = 1300                                      # Jeda kirim pesan (5000 milidetik = 5 detik)
+
+# ----------------- SERVER BOHONGAN UNTUK KOYEB -----------------
+class KoyebPingHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Bot is running nonstop on Koyeb Free Tier!")
+    def log_message(self, format, *args):
+        pass # Menyembunyikan log ping biar dashboard bersih
+
+def run_koyeb_server():
+    # Koyeb secara otomatis mengirimkan nomor PORT lewat environment variable
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), KoyebPingHandler)
+    print(Fore.GREEN + f"✔ Web Server pembantu Koyeb aktif di port {port}")
+    server.serve_forever()
+
+# Jalankan server pembantu di latar belakang
+threading.Thread(target=run_koyeb_server, daemon=True).start()
 
 for n in [3, 2, 1]:
     print(f"Mulai dalam {n}...")
@@ -91,7 +112,7 @@ for i, token in enumerate(tokens):
 
 time.sleep(2)
 
-# ----------------- FUNGSI SOLVER YESCAPTCHA (POLLING ASYNC) -----------------
+# ----------------- FUNGSI SOLVER YESCAPTCHA -----------------
 def solve_image_captcha(image_url):
     if not YESCAPTCHA_CLIENT_KEY or "MASUKKAN" in YESCAPTCHA_CLIENT_KEY:
         return None, "API Key YesCaptcha belum diisi"
@@ -186,7 +207,7 @@ def extract_sapphire(msg):
         except: return 0
     return 0
 
-# ----------------- Runtime & Tampilan -----------------
+# ----------------- Tampilan Log Cloud -----------------
 def get_runtime():
     delta = datetime.now() - start_dt
     hours, remainder = divmod(int(delta.total_seconds()), 3600)
@@ -195,33 +216,23 @@ def get_runtime():
 
 def show_screen():
     while True:
-        # Dioptimalkan untuk Koyeb Logs: Menghindari penumpukan karakter pembersih layar virtual
-        print("\n" + "="*40) 
+        print("\n" + "="*40)
         runtime = get_runtime()
         status_str = Fore.RED + "PAUSED (Merespons Captcha)" if pause_spam else Fore.GREEN + "RUNNING"
         
-        print(Fore.YELLOW + f"=== STATISTIK BOT (CLOUD LOG VIEW) ===")
+        print(Fore.YELLOW + f"=== STATISTIK BOT (CLOUD VIEW) ===")
         print(Fore.CYAN + f"Status : {status_str}")
-        print(Fore.CYAN + f"Solver : YesCaptcha Universal")
         print(Fore.CYAN + f"Durasi : {runtime}")
         print(Fore.YELLOW + "-----------------------------------")
         
-        total_msgs = 0
-        total_saph = 0
-        
         for t, count in counters.items():
             saph = sapphire_counters[t]
-            avg = saph / count if count > 0 else 0
-            total_msgs += count
-            total_saph += saph
-            print(f"{Fore.GREEN}▶ {t.ljust(8)} {Fore.WHITE}| Pesan: {str(count).ljust(4)} | 💎: {str(saph).ljust(5)}")
+            print(f"{Fore.GREEN}▶ {t.ljust(8)} | Pesan: {str(count).ljust(4)} | 💎: {str(saph)}")
             
         print(Fore.YELLOW + "-----------------------------------")
-        print(Fore.YELLOW + "[LOG TERBARU]:")
         if logs:
-            print(list(logs)[-1]) # Hanya menampilkan log baris terakhir di Cloud agar hemat penyimpanan log
-            
-        time.sleep(10) # Diperlama menjadi 10 detik agar log tidak membengkak di dashboard Koyeb
+            print(Fore.WHITE + f"[LOG]: {list(logs)[-1]}")
+        time.sleep(15) # Hemat log Koyeb
 
 threading.Thread(target=show_screen, daemon=True).start()
 
@@ -259,14 +270,14 @@ def listen_channel():
                     
                     if content.startswith("!ganti "):
                         current_message = content.replace("!ganti ", "", 1).strip()
-                        logs.append(Fore.YELLOW + f"[ADMIN] Pesan diubah: {current_message}")
+                        logs.append(f"Pesan diubah: {current_message}")
 
                     elif a_id == UNBELIEVABOAT_ID:
                         amt = extract_sapphire(msg)
                         if amt > 0:
                             target = get_target_token(msg, full_txt)
                             sapphire_counters[target] += amt
-                            logs.append(Fore.GREEN + f"[{target}] +{amt:,} 💎 Sapphire")
+                            logs.append(f"[{target}] +{amt:,} Sapphire")
 
                     elif a_id == MOTHICA_ID:
                         target = get_target_token(msg, full_txt)
@@ -277,18 +288,12 @@ def listen_channel():
                         elif msg.get("embeds") and msg["embeds"][0].get("image"): img_url = msg["embeds"][0]["image"]["url"]
                         
                         ans = None
-                        
                         if img_url:
-                            logs.append(Fore.MAGENTA + f"⏳ [YesCaptcha] Menyelesaikan gambar untuk {target}...")
+                            logs.append(f"Solve Gambar {target}...")
                             ans, err_reason = solve_image_captcha(img_url)
-                            if ans: 
-                                logs.append(Fore.MAGENTA + f"💡 [YesCaptcha] Sukses: {ans}")
-                            else: 
-                                logs.append(Fore.RED + f"✖ [YesCaptcha] Gagal: {err_reason}")
                         else:
                             m = re.search(r'(\d+)\s*([\+\-\*])\s*(\d+)', full_txt)
                             if m:
-                                logs.append(Fore.MAGENTA + f"⏳ [Math] Menghitung soal untuk {target}...")
                                 n1, op, n2 = int(m.group(1)), m.group(2), int(m.group(3))
                                 ans = n1+n2 if op=='+' else (n1-n2 if op=='-' else n1*n2)
                         
@@ -300,12 +305,7 @@ def listen_channel():
                                     json={'content': str(ans)}, headers={'Authorization': token_strings[target]},
                                     timeout=10
                                 )
-                                if res.status_code in [200, 201]:
-                                    logs.append(Fore.GREEN + f"✔ [{target}] Berhasil membalas Captcha!")
-                                else:
-                                    logs.append(Fore.RED + f"✖ [{target}] Gagal membalas (HTTP {res.status_code})")
-                            except:
-                                logs.append(Fore.RED + f"✖ [{target}] Error koneksi saat membalas")
+                            except: pass
                         
                         time.sleep(3 if ans else 10)
                         pause_spam = False
@@ -326,9 +326,7 @@ while True:
         continue
 
     t_name = f"Token {idx+1}"
-    color = colors[idx % len(colors)]
     headers = {'Authorization': tokens[idx]}
-    now = datetime.now().strftime("%H:%M:%S")
     
     with lock:
         msg_send = current_message
@@ -338,11 +336,8 @@ while True:
         if r.status_code in [200, 201]:
             counters[t_name] += 1
             last_sent_token = t_name 
-            logs.append(color + f"[{t_name} | {now}] Pesan terkirim")
-        elif r.status_code == 401:
-            logs.append(Fore.RED + f"[{t_name}] Token invalid/mati!")
-    except:
-        logs.append(Fore.RED + f"[{t_name}] Error koneksi API")
+            logs.append(f"[{t_name}] Pesan terkirim")
+    except: pass
     
     idx = (idx + 1) % len(tokens)
     
