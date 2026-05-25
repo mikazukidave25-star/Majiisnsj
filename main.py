@@ -33,8 +33,8 @@ YESCAPTCHA_CLIENT_KEY = "4833cd9be06f143f76fc531a5312404bbdb09dc0100535"
 
 # ----------------- PENGATURAN OTOMATIS (CLOUD/VPS) -----------------
 # ⚠️ SILAKAN UBAH DUA BAGIAN DI BAWAH INI SEBELUM DI-UPLOAD KE GITHUB
-channel_id = "MASUKKAN_ID_CHANNEL_DISCORD_KAMU"   # <-- Ganti dengan ID Channel Discord kamu (tetap gunakan tanda kutip)
-waktu2 = 5000                                      # <-- Jeda kirim pesan dalam milidetik (contoh: 5000 artinya 5 detik)
+channel_id = "1502243644281720933"   # <-- Ganti dengan ID Channel Discord kamu (tetap gunakan tanda kutip)
+waktu2 = 1300                                      # <-- Jeda kirim pesan dalam milidetik (contoh: 5000 artinya 5 detik)
 
 for n in [3, 2, 1]:
     print(f"Mulai dalam {n}...")
