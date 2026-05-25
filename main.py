@@ -29,12 +29,12 @@ start_dt = datetime.now()
 start_time = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
 # ----------------- KONFIGURASI YESCAPTCHA -----------------
-# WAJIB: MASUKKAN CLIENT KEY / API KEY YESCAPTCHA KAMU DI SINI
 YESCAPTCHA_CLIENT_KEY = "4833cd9be06f143f76fc531a5312404bbdb09dc0100535"
 
-# ----------------- Input Dasar -----------------
-channel_id = input("Masukkan ID channel: ").strip()
-waktu2 = int(input("Set Waktu Kirim Pesan (milidetik): "))
+# ----------------- PENGATURAN OTOMATIS (CLOUD/VPS) -----------------
+# ⚠️ SILAKAN UBAH DUA BAGIAN DI BAWAH INI SEBELUM DI-UPLOAD KE GITHUB
+channel_id = "MASUKKAN_ID_CHANNEL_DISCORD_KAMU"   # <-- Ganti dengan ID Channel Discord kamu (tetap gunakan tanda kutip)
+waktu2 = 5000                                      # <-- Jeda kirim pesan dalam milidetik (contoh: 5000 artinya 5 detik)
 
 for n in [3, 2, 1]:
     print(f"Mulai dalam {n}...")
@@ -56,7 +56,7 @@ colors = [Fore.CYAN, Fore.GREEN, Fore.MAGENTA, Fore.BLUE, Fore.YELLOW, Fore.RED]
 # ----------------- Global State & Variabel -----------------
 lock = threading.Lock()
 pause_spam = False
-last_sent_token = "Token 1" # Melacak token yang terakhir kali mengirim pesan
+last_sent_token = "Token 1" 
 
 counters = {f"Token {i+1}": 0 for i in range(len(tokens))}
 sapphire_counters = {f"Token {i+1}": 0 for i in range(len(tokens))}
@@ -96,7 +96,6 @@ def solve_image_captcha(image_url):
     if not YESCAPTCHA_CLIENT_KEY or "MASUKKAN" in YESCAPTCHA_CLIENT_KEY:
         return None, "API Key YesCaptcha belum diisi"
 
-    # 1. Unduh gambar dengan User-Agent agar tidak ditolak Discord CDN
     headers_dl = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
         img_resp = requests.get(image_url, headers=headers_dl, timeout=15)
@@ -107,7 +106,6 @@ def solve_image_captcha(image_url):
 
     img_base64 = base64.b64encode(img_resp.content).decode('utf-8')
     
-    # 2. Buat Task ke YesCaptcha
     create_url = "https://api.yescaptcha.com/createTask"
     payload_create = {
         "clientKey": YESCAPTCHA_CLIENT_KEY,
@@ -129,7 +127,6 @@ def solve_image_captcha(image_url):
     except:
         return None, "Koneksi createTask timeout/error"
 
-    # 3. Polling Hasil Pengenalan
     result_url = "https://api.yescaptcha.com/getTaskResult"
     payload_result = {
         "clientKey": YESCAPTCHA_CLIENT_KEY,
@@ -137,7 +134,7 @@ def solve_image_captcha(image_url):
     }
     
     start_poll = time.time()
-    while time.time() - start_poll < 15: # Polling maksimal 15 detik
+    while time.time() - start_poll < 15: 
         time.sleep(1.5)
         try:
             r = requests.post(result_url, json=payload_result, timeout=10)
@@ -156,28 +153,23 @@ def solve_image_captcha(image_url):
 # ----------------- Ekstraksi Data Pesan -----------------
 def get_target_token(msg, full_text=""):
     global last_sent_token
-    # 1. Cek Mentions API
     for user in msg.get("mentions", []):
         uid = str(user.get("id"))
         if uid in token_info: return token_info[uid]
     
-    # 2. Cek format Tag Raw
     for uid in re.findall(r'<@!?(\d+)>', full_text):
         if uid in token_info: return token_info[uid]
 
-    # 3. Cek Embed Author
     if msg.get("embeds"):
         author = msg["embeds"][0].get("author", {})
         m = re.search(r'/avatars/(\d+)/', author.get("icon_url", ""))
         if m and m.group(1) in token_info: return token_info[m.group(1)]
         if author.get("name", "").lower() in token_info: return token_info[author.get("name", "").lower()]
 
-    # 4. Pencocokan Substring Nama
     for key, t_name in token_info.items():
         if not key.isdigit() and key.lower() in full_text.lower():
             return t_name
             
-    # 5. SMART FALLBACK: Jika tidak ketemu, gunakan token yang paling terakhir mengirim pesan
     return last_sent_token
 
 def extract_sapphire(msg):
@@ -203,14 +195,15 @@ def get_runtime():
 
 def show_screen():
     while True:
-        os.system('cls' if os.name == 'nt' else 'clear')
+        # Dioptimalkan untuk Koyeb Logs: Menghindari penumpukan karakter pembersih layar virtual
+        print("\n" + "="*40) 
         runtime = get_runtime()
         status_str = Fore.RED + "PAUSED (Merespons Captcha)" if pause_spam else Fore.GREEN + "RUNNING"
         
-        print(Fore.YELLOW + f"=== STATISTIK BOT (MOBILE VIEW) ===")
+        print(Fore.YELLOW + f"=== STATISTIK BOT (CLOUD LOG VIEW) ===")
         print(Fore.CYAN + f"Status : {status_str}")
         print(Fore.CYAN + f"Solver : YesCaptcha Universal")
-        print(Fore.CYAN + f"Durasi : {runtime} (Mulai: {start_time.split()[1]})")
+        print(Fore.CYAN + f"Durasi : {runtime}")
         print(Fore.YELLOW + "-----------------------------------")
         
         total_msgs = 0
@@ -221,19 +214,14 @@ def show_screen():
             avg = saph / count if count > 0 else 0
             total_msgs += count
             total_saph += saph
-            print(f"{Fore.GREEN}▶ {t.ljust(8)} {Fore.WHITE}| Pesan: {str(count).ljust(4)} | 💎: {str(saph).ljust(5)} | Avg: {avg:.1f}")
+            print(f"{Fore.GREEN}▶ {t.ljust(8)} {Fore.WHITE}| Pesan: {str(count).ljust(4)} | 💎: {str(saph).ljust(5)}")
             
-        global_avg = total_saph / total_msgs if total_msgs > 0 else 0
         print(Fore.YELLOW + "-----------------------------------")
-        print(f"{Fore.YELLOW}★ TOTAL    {Fore.WHITE}| Pesan: {str(total_msgs).ljust(4)} | 💎: {str(total_saph).ljust(5)} | Avg: {global_avg:.1f}")
-        print(Fore.YELLOW + "===================================\n")
-        
-        print(Fore.CYAN + f"Pesan Spam: \"{current_message}\"\n")
-        print(Fore.YELLOW + "[LOG REAL-TIME]:")
-        for log in list(logs):
-            print(log)
+        print(Fore.YELLOW + "[LOG TERBARU]:")
+        if logs:
+            print(list(logs)[-1]) # Hanya menampilkan log baris terakhir di Cloud agar hemat penyimpanan log
             
-        time.sleep(1)
+        time.sleep(10) # Diperlama menjadi 10 detik agar log tidak membengkak di dashboard Koyeb
 
 threading.Thread(target=show_screen, daemon=True).start()
 
@@ -249,7 +237,6 @@ def listen_channel():
 
     while True:
         try:
-            # Menggunakan limit=30 agar pesan captcha tidak terlewat saat spam cepat
             r = requests.get(f"https://discord.com/api/v9/channels/{channel_id}/messages?limit=30", headers=headers, timeout=10)
             if r.status_code == 200:
                 msgs = r.json()
@@ -270,12 +257,10 @@ def listen_channel():
                     if msg.get("embeds"): embed_desc = msg["embeds"][0].get("description", "")
                     full_txt = content + " " + embed_desc
                     
-                    # 1. Ganti Pesan Admin
                     if content.startswith("!ganti "):
                         current_message = content.replace("!ganti ", "", 1).strip()
                         logs.append(Fore.YELLOW + f"[ADMIN] Pesan diubah: {current_message}")
 
-                    # 2. Perhitungan Saldo Sapphire
                     elif a_id == UNBELIEVABOAT_ID:
                         amt = extract_sapphire(msg)
                         if amt > 0:
@@ -283,19 +268,16 @@ def listen_channel():
                             sapphire_counters[target] += amt
                             logs.append(Fore.GREEN + f"[{target}] +{amt:,} 💎 Sapphire")
 
-                    # 3. Deteksi Captcha Mothica (Pemicu Universal)
                     elif a_id == MOTHICA_ID:
                         target = get_target_token(msg, full_txt)
-                        pause_spam = True # STOP SPAM LANGSUNG
+                        pause_spam = True 
                         
-                        # Cari keberadaan lampiran gambar
                         img_url = None
                         if msg.get("attachments"): img_url = msg["attachments"][0]["url"]
                         elif msg.get("embeds") and msg["embeds"][0].get("image"): img_url = msg["embeds"][0]["image"]["url"]
                         
                         ans = None
                         
-                        # KONDISI A: Jika ada gambar, langsung picu YesCaptcha
                         if img_url:
                             logs.append(Fore.MAGENTA + f"⏳ [YesCaptcha] Menyelesaikan gambar untuk {target}...")
                             ans, err_reason = solve_image_captcha(img_url)
@@ -303,10 +285,6 @@ def listen_channel():
                                 logs.append(Fore.MAGENTA + f"💡 [YesCaptcha] Sukses: {ans}")
                             else: 
                                 logs.append(Fore.RED + f"✖ [YesCaptcha] Gagal: {err_reason}")
-                                print("\a\a\a\a\a") # Alarm darurat
-                                logs.append(Fore.YELLOW + f"⚠️ JAWAB MANUAL DI DISCORD SEKARANG!")
-                        
-                        # KONDISI B: Jika tidak ada gambar, pindai angka matematika
                         else:
                             m = re.search(r'(\d+)\s*([\+\-\*])\s*(\d+)', full_txt)
                             if m:
@@ -314,7 +292,6 @@ def listen_channel():
                                 n1, op, n2 = int(m.group(1)), m.group(2), int(m.group(3))
                                 ans = n1+n2 if op=='+' else (n1-n2 if op=='-' else n1*n2)
                         
-                        # Eksekusi Pengiriman Balasan
                         if ans:
                             time.sleep(random.uniform(1.0, 2.5))
                             try:
@@ -344,6 +321,10 @@ while True:
     while pause_spam:
         time.sleep(0.5)
     
+    if not tokens:
+        time.sleep(1)
+        continue
+
     t_name = f"Token {idx+1}"
     color = colors[idx % len(colors)]
     headers = {'Authorization': tokens[idx]}
@@ -356,7 +337,7 @@ while True:
         r = requests.post(f"https://discord.com/api/v9/channels/{channel_id}/messages", json={'content': msg_send}, headers=headers, timeout=10)
         if r.status_code in [200, 201]:
             counters[t_name] += 1
-            last_sent_token = t_name # Catat token terakhir yang berhasil mengirim pesan
+            last_sent_token = t_name 
             logs.append(color + f"[{t_name} | {now}] Pesan terkirim")
         elif r.status_code == 401:
             logs.append(Fore.RED + f"[{t_name}] Token invalid/mati!")
