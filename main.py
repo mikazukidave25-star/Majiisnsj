@@ -29,33 +29,29 @@ time.sleep(1)
 start_dt = datetime.now()
 start_time = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-# ----------------- KONFIGURASI YESCAPTCHA -----------------
+# ----------------- KONFIGURASI UTAMA (UBAH DI SINI) -----------------
 YESCAPTCHA_CLIENT_KEY = "4833cd9be06f143f76fc531a5312404bbdb09dc0100535"
 
-# ----------------- PENGATURAN OTOMATIS CLOUD -----------------
-# ⚠️ SILAKAN UBAH ID CHANNEL DI BAWAH INI
-channel_id = "1502243644281720933"   # <-- Ganti dengan ID Channel Discord kamu
-waktu2 = 1300                                      # Jeda kirim pesan (5000 milidetik = 5 detik)
+# ⚠️ GANTI DENGAN ID CHANNEL DISCORD KAMU
+channel_id = "MASUKKAN_ID_CHANNEL_DISCORD_DISINI" 
 
-# ----------------- SERVER BOHONGAN UNTUK KOYEB -----------------
-class KoyebPingHandler(BaseHTTPRequestHandler):
+# ----------------- WEB SERVER PANCINGAN KOYEB -----------------
+class KoyebKeepAliveHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
-        self.wfile.write(b"Bot is running nonstop on Koyeb Free Tier!")
+        self.wfile.write(b"Bot Multi-threading 31s Per Account is Active!")
     def log_message(self, format, *args):
-        pass # Menyembunyikan log ping biar dashboard bersih
+        pass
 
-def run_koyeb_server():
-    # Koyeb secara otomatis mengirimkan nomor PORT lewat environment variable
+def run_web_server():
     port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), KoyebPingHandler)
-    print(Fore.GREEN + f"✔ Web Server pembantu Koyeb aktif di port {port}")
+    server = HTTPServer(("0.0.0.0", port), KoyebKeepAliveHandler)
+    print(Fore.GREEN + f"✔ Web Server internal berjalan di port {port}")
     server.serve_forever()
 
-# Jalankan server pembantu di latar belakang
-threading.Thread(target=run_koyeb_server, daemon=True).start()
+threading.Thread(target=run_web_server, daemon=True).start()
 
 for n in [3, 2, 1]:
     print(f"Mulai dalam {n}...")
@@ -207,7 +203,7 @@ def extract_sapphire(msg):
         except: return 0
     return 0
 
-# ----------------- Tampilan Log Cloud -----------------
+# ----------------- Cloud Dashboard Log -----------------
 def get_runtime():
     delta = datetime.now() - start_dt
     hours, remainder = divmod(int(delta.total_seconds()), 3600)
@@ -216,23 +212,11 @@ def get_runtime():
 
 def show_screen():
     while True:
-        print("\n" + "="*40)
         runtime = get_runtime()
-        status_str = Fore.RED + "PAUSED (Merespons Captcha)" if pause_spam else Fore.GREEN + "RUNNING"
-        
-        print(Fore.YELLOW + f"=== STATISTIK BOT (CLOUD VIEW) ===")
-        print(Fore.CYAN + f"Status : {status_str}")
-        print(Fore.CYAN + f"Durasi : {runtime}")
-        print(Fore.YELLOW + "-----------------------------------")
-        
-        for t, count in counters.items():
-            saph = sapphire_counters[t]
-            print(f"{Fore.GREEN}▶ {t.ljust(8)} | Pesan: {str(count).ljust(4)} | 💎: {str(saph)}")
-            
-        print(Fore.YELLOW + "-----------------------------------")
+        print(f"[CLOUD LOG] Status: RUNNING | Durasi Aktif: {runtime}")
         if logs:
-            print(Fore.WHITE + f"[LOG]: {list(logs)[-1]}")
-        time.sleep(15) # Hemat log Koyeb
+            print(f"[TERBARU]: {list(logs)[-1]}")
+        time.sleep(30) 
 
 threading.Thread(target=show_screen, daemon=True).start()
 
@@ -300,7 +284,10 @@ def listen_channel():
                         if ans:
                             time.sleep(random.uniform(1.0, 2.5))
                             try:
-                                res = requests.post(
+                                requests.post(f"https://discord.com/api/v9/channels/{channel_id}/typing", headers={'Authorization': token_strings[target]}, timeout=5)
+                                time.sleep(random.uniform(1.0, 2.0))
+                                
+                                requests.post(
                                     f"https://discord.com/api/v9/channels/{channel_id}/messages", 
                                     json={'content': str(ans)}, headers={'Authorization': token_strings[target]},
                                     timeout=10
@@ -315,35 +302,55 @@ def listen_channel():
 
 threading.Thread(target=listen_channel, daemon=True).start()
 
-# ----------------- Loop Utama (Spammer) -----------------
-idx = 0
-while True:
-    while pause_spam:
-        time.sleep(0.5)
-    
-    if not tokens:
-        time.sleep(1)
-        continue
-
+# ----------------- JALUR SPAMMER MANDIRI (Masing-masing 31 Detik) -----------------
+def run_spammer_akun(idx, token):
     t_name = f"Token {idx+1}"
-    headers = {'Authorization': tokens[idx]}
+    headers = {'Authorization': token}
     
-    with lock:
-        msg_send = current_message
+    while True:
+        if pause_spam:
+            time.sleep(0.5)
+            continue
+            
+        try:
+            # 1. Simulasi Mengetik
+            requests.post(f"https://discord.com/api/v9/channels/{channel_id}/typing", headers=headers, timeout=5)
+            time.sleep(random.uniform(1.5, 3.0)) # Durasi mengetik natural
+            
+            if pause_spam:
+                continue
+                
+            # 2. Ambil isi pesan.txt secara acak agar bervariasi
+            with lock:
+                msg_send = random.choice(words) if words else current_message
+                
+            # 3. Kirim Pesan ke Channel
+            r = requests.post(f"https://discord.com/api/v9/channels/{channel_id}/messages", json={'content': msg_send}, headers=headers, timeout=10)
+            if r.status_code in [200, 201]:
+                counters[t_name] += 1
+                global last_sent_token
+                last_sent_token = t_name 
+                logs.append(f"[{t_name}] Pesan terkirim")
+        except: pass
         
-    try:
-        r = requests.post(f"https://discord.com/api/v9/channels/{channel_id}/messages", json={'content': msg_send}, headers=headers, timeout=10)
-        if r.status_code in [200, 201]:
-            counters[t_name] += 1
-            last_sent_token = t_name 
-            logs.append(f"[{t_name}] Pesan terkirim")
-    except: pass
-    
-    idx = (idx + 1) % len(tokens)
-    
-    sleep_interval = waktu2 / 1000
-    elapsed = 0
-    while elapsed < sleep_interval:
-        if pause_spam: break
-        time.sleep(0.2)
-        elapsed += 0.2
+        # 4. JEDA WAJIB 31 DETIK PER AKUN INDIVIDU (+ bonus acak tipis agar aman dari sistem deteksi)
+        sleep_interval = 31.0 + random.uniform(0.5, 2.0)
+        elapsed = 0
+        while elapsed < sleep_interval:
+            if pause_spam:
+                time.sleep(1) # Jika ada Captcha, durasi hitung mundur dibekukan dulu
+                continue
+            time.sleep(0.5)
+            elapsed += 0.5
+
+# --- Eksekusi Multi-Thread Per Akun ---
+# Rumus pembagian waktu rilis awal (Stagger) agar antar akun tidak bertabrakan saat pertama dinyalakan
+stagger_delay = 31.0 / len(tokens) if len(tokens) > 0 else 3.0
+
+for i, token in enumerate(tokens):
+    threading.Thread(target=run_spammer_akun, args=(i, token), daemon=True).start()
+    time.sleep(stagger_delay) # Jeda rilis antar akun di awal mula
+
+# Menjaga main thread Koyeb agar tetap hidup selamanya
+while True:
+    time.sleep(1)
