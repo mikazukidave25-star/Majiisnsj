@@ -6,7 +6,6 @@ import threading
 from datetime import datetime
 from colorama import init, Fore
 import re
-from collections import deque
 import base64
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -58,6 +57,7 @@ counters = {f"Token {i+1}": 0 for i in range(len(tokens))}
 current_message = random.choice(words) if words else "Bot Active"
 token_info = {}
 token_strings = {}
+last_sent_token = "Token 1"
 
 # ----------------- Verifikasi Token -----------------
 print(Fore.YELLOW + "⏳ Memulai sistem dan memverifikasi token...")
@@ -72,7 +72,7 @@ for i, token in enumerate(tokens):
             print(Fore.GREEN + f"✔ [{t_name}] Terhubung: {data['username']}")
         else:
             print(Fore.RED + f"✖ [{t_name}] Invalid! Status: {r.status_code}")
-    except Exception as e:
+    except Exception:
         print(Fore.RED + f"✖ [{t_name}] Error koneksi awal.")
 
 # ----------------- YESCAPTCHA SOLVER -----------------
@@ -94,8 +94,78 @@ def solve_image_captcha(image_url):
     except: pass
     return None
 
+# ----------------- MATA BOT (Pendeteksi Chat & Captcha) -----------------
+def get_target_token(msg, full_text=""):
+    global last_sent_token
+    for user in msg.get("mentions", []):
+        if str(user.get("id")) in token_info: return token_info[str(user.get("id"))]
+    for uid in re.findall(r'<@!?(\d+)>', full_text):
+        if uid in token_info: return token_info[uid]
+    return last_sent_token
+
+def listen_channel():
+    global current_message, pause_spam
+    if not tokens: return
+    headers = {"Authorization": tokens[0], "User-Agent": random.choice(UA_LIST)}
+    last_id = None
+    MOTHICA_ID = "1357551261494415431"
+
+    while True:
+        try:
+            r = requests.get(f"https://discord.com/api/v9/channels/{channel_id}/messages?limit=10", headers=headers, timeout=10)
+            if r.status_code == 200:
+                msgs = r.json()
+                if last_id is None:
+                    if msgs: last_id = int(msgs[0]["id"])
+                    time.sleep(2)
+                    continue
+                new_msgs = [m for m in msgs if int(m["id"]) > last_id]
+                new_msgs.sort(key=lambda x: int(x["id"]))
+                
+                for msg in new_msgs:
+                    last_id = int(msg["id"])
+                    content = msg.get("content", "")
+                    a_id = str(msg.get("author", {}).get("id", ""))
+                    
+                    # 1. Fitur Ganti Pesan
+                    if content.startswith("!ganti "):
+                        current_message = content.replace("!ganti ", "", 1).strip()
+                        print(Fore.CYAN + f"⚙ Perintah Diterima: Pesan diubah menjadi -> {current_message}")
+                    
+                    # 2. Fitur Deteksi Captcha Mothica
+                    elif a_id == MOTHICA_ID:
+                        target = get_target_token(msg, content)
+                        pause_spam = True
+                        print(Fore.YELLOW + f"🔒 [Mothica] Captcha muncul untuk {target}! Menjeda aktivitas spam...")
+                        
+                        img_url = msg["attachments"][0]["url"] if msg.get("attachments") else (msg["embeds"][0].get("image", {}).get("url") if msg.get("embeds") else None)
+                        
+                        ans = None
+                        if img_url:
+                            print(Fore.YELLOW + f"⏳ Meminta YesCaptcha memecahkan gambar...")
+                            ans = solve_image_captcha(img_url)
+                        
+                        if ans:
+                            time.sleep(random.uniform(1.5, 3.0))
+                            try:
+                                t_headers = {'Authorization': token_strings[target], 'User-Agent': random.choice(UA_LIST)}
+                                requests.post(f"https://discord.com/api/v9/channels/{channel_id}/typing", headers=t_headers, timeout=5)
+                                time.sleep(random.uniform(1.0, 2.0))
+                                requests.post(f"https://discord.com/api/v9/channels/{channel_id}/messages", json={'content': str(ans)}, headers=t_headers, timeout=10)
+                                print(Fore.GREEN + f"✔ [{target}] Captcha Sukses Terjawab: {ans}")
+                            except: pass
+                        
+                        # Tunggu sebentar sebelum melanjutkan spam
+                        time.sleep(4)
+                        pause_spam = False
+        except: pass
+        
+        # Jeda refresh mata bot setiap 2 detik
+        time.sleep(2)
+
 # ----------------- Loop Spammer Per Akun -----------------
 def run_spammer_akun(idx, token):
+    global last_sent_token
     t_name = f"Token {idx+1}"
     time.sleep(idx * (33.0 / max(1, len(tokens)))) 
     
@@ -107,10 +177,7 @@ def run_spammer_akun(idx, token):
         headers = {'Authorization': token, 'Content-Type': 'application/json', 'User-Agent': random.choice(UA_LIST)}
         
         try:
-            # TRIGGER TYPING
             requests.post(f"https://discord.com/api/v9/channels/{channel_id}/typing", headers=headers, timeout=5)
-            
-            # 🔥 JEDA MENGETIK DIPERCEPAT (0.5 - 1.5 detik) 🔥
             time.sleep(random.uniform(0.5, 1.5))
             
             if not pause_spam:
@@ -121,6 +188,7 @@ def run_spammer_akun(idx, token):
                 
                 if r.status_code in [200, 201]:
                     counters[t_name] += 1
+                    last_sent_token = t_name
                     print(Fore.CYAN + f"🚀 [{t_name}] Pesan Terkirim ({counters[t_name]})")
                 elif r.status_code == 429:
                     retry_after = r.json().get("retry_after", 5)
@@ -133,7 +201,12 @@ def run_spammer_akun(idx, token):
         
         time.sleep(31.0 + random.uniform(1.0, 3.5))
 
+# --- Eksekusi Utama ---
 if tokens:
+    # Nyalakan thread Mata Bot
+    threading.Thread(target=listen_channel, daemon=True).start()
+    
+    # Nyalakan thread Pengirim Pesan
     for i, tkn in enumerate(tokens):
         threading.Thread(target=run_spammer_akun, args=(i, tkn), daemon=True).start()
     
