@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 YESCAPTCHA_CLIENT_KEY = "4833cd9be06f143f76fc531a5312404bbdb09dc0100535"
 
 # ⚠️ UBAH BAGIAN INI: MASUKKAN ID CHANNEL DISCORD KAMU! ⚠️
-channel_id = "MASUKKAN_ID_CHANNEL_DISCORD_DISINI" 
+channel_id = "1293476303789494304" 
 
 init(autoreset=True)
 start_dt = datetime.now()
