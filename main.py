@@ -4,7 +4,7 @@ import random
 import requests
 import threading
 from datetime import datetime
-from colorama import init, Fore
+from colorama import Fore, init
 import re
 import base64
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 YESCAPTCHA_CLIENT_KEY = "4833cd9be06f143f76fc531a5312404bbdb09dc0100535"
 
 # ⚠️ UBAH BAGIAN INI: MASUKKAN ID CHANNEL DISCORD KAMU! ⚠️
-channel_id = "1502243644281720933" 
+channel_id = "MASUKKAN_ID_CHANNEL_DISCORD_DISINI" 
 
 init(autoreset=True)
 start_dt = datetime.now()
@@ -23,7 +23,9 @@ UA_LIST = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 ]
 
-# ----------------- Server Pancingan Render -----------------
+colors = [Fore.CYAN, Fore.GREEN, Fore.MAGENTA, Fore.BLUE, Fore.YELLOW]
+
+# ----------------- Server Web Mini (Wajib untuk Render) -----------------
 class RenderKeepAliveHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -36,7 +38,7 @@ class RenderKeepAliveHandler(BaseHTTPRequestHandler):
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), RenderKeepAliveHandler)
-    print(Fore.GREEN + f"✔ Web Server internal berjalan di port {port}")
+    print(Fore.GREEN + f"✔ Web Server Render berjalan di port {port}")
     server.serve_forever()
 
 threading.Thread(target=run_web_server, daemon=True).start()
@@ -51,10 +53,19 @@ def load_file(filename, default_val):
 words = load_file("pesan.txt", ["Halo ini pesan otomatis"])
 tokens = load_file("token.txt", [])
 
+if not tokens:
+    print(Fore.RED + "Data token.txt kosong! Bot dihentikan.")
+    exit()
+
 lock = threading.Lock()
 pause_spam = False
 counters = {f"Token {i+1}": 0 for i in range(len(tokens))}
-current_message = random.choice(words) if words else "Bot Active"
+sapphire_counters = {f"Token {i+1}": 0 for i in range(len(tokens))}
+
+# Variabel untuk fitur !ganti satu putaran
+custom_message = None
+custom_message_sent_by = set()
+
 token_info = {}
 token_strings = {}
 last_sent_token = "Token 1"
@@ -78,7 +89,7 @@ for i, token in enumerate(tokens):
 # ----------------- YESCAPTCHA SOLVER -----------------
 def solve_image_captcha(image_url):
     if not YESCAPTCHA_CLIENT_KEY or "MASUKKAN" in YESCAPTCHA_CLIENT_KEY:
-        return None
+        return None, "API Key YesCaptcha kosong"
     try:
         img_resp = requests.get(image_url, headers={'User-Agent': random.choice(UA_LIST)}, timeout=15)
         img_base64 = base64.b64encode(img_resp.content).decode('utf-8')
@@ -90,9 +101,9 @@ def solve_image_captcha(image_url):
             time.sleep(1.5)
             r = requests.post("https://api.yescaptcha.com/getTaskResult", json={"clientKey": YESCAPTCHA_CLIENT_KEY, "taskId": task_id}, timeout=10)
             if r.json().get("status") == "ready":
-                return re.sub(r'[^A-Za-z0-9]', '', r.json().get("solution", {}).get("text", "")).upper()
+                return re.sub(r'[^A-Za-z0-9]', '', r.json().get("solution", {}).get("text", "")).upper(), None
     except: pass
-    return None
+    return None, "Timeout/Error YesCaptcha"
 
 # ----------------- MATA BOT (Pendeteksi Chat & Captcha) -----------------
 def get_target_token(msg, full_text=""):
@@ -103,11 +114,16 @@ def get_target_token(msg, full_text=""):
         if uid in token_info: return token_info[uid]
     return last_sent_token
 
+def extract_sapphire(msg):
+    text = msg.get("content", "") or (msg["embeds"][0].get("description", "") if msg.get("embeds") else "")
+    match = re.search(r'(?:<a?:[a-zA-Z0-9_]+:\d+>|💎|🔷)\s*([\d,\.]+)', text) or re.search(r'([\d,\.]+)\s*sapphire', text, re.IGNORECASE)
+    return int(match.group(1).replace(",", "").replace(".", "")) if match else 0
+
 def listen_channel():
-    global current_message, pause_spam
-    if not tokens: return
+    global custom_message, custom_message_sent_by, pause_spam
     headers = {"Authorization": tokens[0], "User-Agent": random.choice(UA_LIST)}
     last_id = None
+    UNBELIEVABOAT_ID = "292953664492929025"
     MOTHICA_ID = "1357551261494415431"
 
     while True:
@@ -126,24 +142,52 @@ def listen_channel():
                     last_id = int(msg["id"])
                     content = msg.get("content", "")
                     a_id = str(msg.get("author", {}).get("id", ""))
+                    full_txt = content + " " + (msg["embeds"][0].get("description", "") if msg.get("embeds") else "")
                     
-                    # 1. Fitur Ganti Pesan
+                    # 1. PERINTAH !ganti (1 putaran)
                     if content.startswith("!ganti "):
-                        current_message = content.replace("!ganti ", "", 1).strip()
-                        print(Fore.CYAN + f"⚙ Perintah Diterima: Pesan diubah menjadi -> {current_message}")
+                        with lock:
+                            custom_message = content.replace("!ganti ", "", 1).strip()
+                            custom_message_sent_by.clear() # Reset data pelacakan
+                        print(Fore.CYAN + f"⚙ Perintah Diterima: Pesan '{custom_message}' ditambahkan untuk 1 putaran.")
                     
-                    # 2. Fitur Deteksi Captcha Mothica
+                    # 2. PERINTAH !data (Cek Sapphire)
+                    elif content.strip() == "!data":
+                        print(Fore.CYAN + "⚙ Perintah Diterima: Mengirim laporan Sapphire ke channel.")
+                        msg_data = "📊 **Laporan Sapphire Saat Ini:**\n"
+                        for t, amt in sapphire_counters.items():
+                            msg_data += f"> **{t}**: {amt:,} 💎\n"
+                        try:
+                            # Token 1 akan membalas pesan !data tersebut
+                            requests.post(f"https://discord.com/api/v9/channels/{channel_id}/messages", 
+                                          json={'content': msg_data}, headers=headers, timeout=10)
+                        except: pass
+                        
+                    # 3. MENDATA SAPPHIRE
+                    elif a_id == UNBELIEVABOAT_ID:
+                        amt = extract_sapphire(msg)
+                        if amt > 0:
+                            target = get_target_token(msg, full_txt)
+                            sapphire_counters[target] += amt
+                            print(Fore.GREEN + f"💰 [{target}] +{amt:,} Sapphire (Total: {sapphire_counters[target]:,})")
+                    
+                    # 4. DETEKSI CAPTCHA
                     elif a_id == MOTHICA_ID:
-                        target = get_target_token(msg, content)
+                        target = get_target_token(msg, full_txt)
                         pause_spam = True
-                        print(Fore.YELLOW + f"🔒 [Mothica] Captcha muncul untuk {target}! Menjeda aktivitas spam...")
+                        print(Fore.YELLOW + f"🔒 [Mothica] Captcha muncul untuk {target}! Menjeda spam...")
                         
                         img_url = msg["attachments"][0]["url"] if msg.get("attachments") else (msg["embeds"][0].get("image", {}).get("url") if msg.get("embeds") else None)
-                        
                         ans = None
+                        
                         if img_url:
-                            print(Fore.YELLOW + f"⏳ Meminta YesCaptcha memecahkan gambar...")
-                            ans = solve_image_captcha(img_url)
+                            print(Fore.MAGENTA + f"⏳ [YesCaptcha] Memecahkan gambar...")
+                            ans, err = solve_image_captcha(img_url)
+                        else:
+                            m = re.search(r'(\d+)\s*([\+\-\*])\s*(\d+)', full_txt)
+                            if m:
+                                n1, op, n2 = int(m.group(1)), m.group(2), int(m.group(3))
+                                ans = n1+n2 if op=='+' else (n1-n2 if op=='-' else n1*n2)
                         
                         if ans:
                             time.sleep(random.uniform(1.5, 3.0))
@@ -155,41 +199,64 @@ def listen_channel():
                                 print(Fore.GREEN + f"✔ [{target}] Captcha Sukses Terjawab: {ans}")
                             except: pass
                         
-                        # Tunggu sebentar sebelum melanjutkan spam
                         time.sleep(4)
                         pause_spam = False
         except: pass
-        
-        # Jeda refresh mata bot setiap 2 detik
         time.sleep(2)
 
 # ----------------- Loop Spammer Per Akun -----------------
 def run_spammer_akun(idx, token):
-    global last_sent_token
+    global last_sent_token, custom_message, custom_message_sent_by
     t_name = f"Token {idx+1}"
-    time.sleep(idx * (33.0 / max(1, len(tokens)))) 
+    color = colors[idx % len(colors)]
+    
+    # Stagger Start: Memisahkan jarak mulai antar akun
+    time.sleep(idx * (30.0 / max(1, len(tokens)))) 
     
     while True:
         if pause_spam:
-            time.sleep(2)
+            time.sleep(1)
             continue
             
         headers = {'Authorization': token, 'Content-Type': 'application/json', 'User-Agent': random.choice(UA_LIST)}
         
         try:
+            # 1. TRIGGER TYPING
             requests.post(f"https://discord.com/api/v9/channels/{channel_id}/typing", headers=headers, timeout=5)
-            time.sleep(random.uniform(0.5, 1.5))
+            
+            # 2. JEDA TYPING (0,5 Detik)
+            time.sleep(0.5)
             
             if not pause_spam:
-                with lock:
-                    msg_send = random.choice(words) if words else current_message
+                is_custom_msg = False
                 
+                with lock:
+                    # Tentukan pesan apa yang akan dikirim (Custom 1 putaran atau Random normal)
+                    if custom_message and t_name not in custom_message_sent_by:
+                        msg_send = custom_message
+                        is_custom_msg = True
+                    else:
+                        msg_send = random.choice(words) if words else "Bot Active"
+                
+                # 3. KIRIM PESAN
                 r = requests.post(f"https://discord.com/api/v9/channels/{channel_id}/messages", json={'content': msg_send}, headers=headers, timeout=10)
                 
+                now = datetime.now().strftime("%H:%M:%S")
                 if r.status_code in [200, 201]:
                     counters[t_name] += 1
                     last_sent_token = t_name
-                    print(Fore.CYAN + f"🚀 [{t_name}] Pesan Terkirim ({counters[t_name]})")
+                    print(color + f"[{now}] 🚀 {t_name} | Pesan ke-{counters[t_name]} Terkirim")
+                    
+                    # Jika berhasil mengirim pesan custom, catat akun ini
+                    if is_custom_msg:
+                        with lock:
+                            custom_message_sent_by.add(t_name)
+                            # Cek apakah SEMUA akun sudah mengirim pesan custom
+                            if len(custom_message_sent_by) >= len(tokens):
+                                print(Fore.CYAN + "🔄 Semua token selesai mengirim pesan !ganti. Kembali ke mode acak normal.")
+                                custom_message = None
+                                custom_message_sent_by.clear()
+                                
                 elif r.status_code == 429:
                     retry_after = r.json().get("retry_after", 5)
                     print(Fore.YELLOW + f"⚠️ [{t_name}] Rate Limit! Istirahat {retry_after}s")
@@ -199,14 +266,21 @@ def run_spammer_akun(idx, token):
         except:
             print(Fore.RED + f"⚠️ [{t_name}] Gangguan jaringan.")
         
-        time.sleep(31.0 + random.uniform(1.0, 3.5))
+        # 4. JEDA WAJIB 30 DETIK + ACAK (0,5 - 3 detik)
+        sleep_interval = 30.0 + random.uniform(0.5, 3.0)
+        elapsed = 0
+        
+        while elapsed < sleep_interval:
+            if pause_spam:
+                time.sleep(1)
+                continue
+            time.sleep(0.5)
+            elapsed += 0.5
 
 # --- Eksekusi Utama ---
 if tokens:
-    # Nyalakan thread Mata Bot
     threading.Thread(target=listen_channel, daemon=True).start()
     
-    # Nyalakan thread Pengirim Pesan
     for i, tkn in enumerate(tokens):
         threading.Thread(target=run_spammer_akun, args=(i, tkn), daemon=True).start()
     
