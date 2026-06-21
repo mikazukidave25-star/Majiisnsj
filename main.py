@@ -43,8 +43,8 @@ if not tokens:
 
 # ----------------- Input via Environment Variables -----------------
 # Menggantikan input() manual karena Render tidak mendukung terminal interaktif
-guild_id = os.environ.get("725672802254061601")
-channel_id = os.environ.get("1518239074777960640")
+guild_id = os.environ.get("GUILD_ID")
+channel_id = os.environ.get("CHANNEL_ID")
 
 if not guild_id or not channel_id:
     print(Fore.RED + "GAGAL: GUILD_ID atau CHANNEL_ID belum disetting di Environment Variables Render!")
@@ -94,10 +94,11 @@ def start_bot(token, index):
             voice_payload = {
                 "op": 4,
                 "d": {
-                    "guild_id": guild_id,
-                    "channel_id": channel_id,
-                    "self_mute": True,
-                    "self_deaf": True  
+                    "guild_id": 725672802254061601,
+                    "channel_id": 1518195225489834095,
+                    "self_mute": False,
+                    "self_deaf": False
+                 
                 }
             }
             ws.send(json.dumps(voice_payload))
