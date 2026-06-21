@@ -43,8 +43,8 @@ if not tokens:
 
 # ----------------- Input via Environment Variables -----------------
 # Menggantikan input() manual karena Render tidak mendukung terminal interaktif
-guild_id = os.environ.get("GUILD_ID")
-channel_id = os.environ.get("CHANNEL_ID")
+guild_id = os.environ.get("725672802254061601")
+channel_id = os.environ.get("1518239074777960640")
 
 if not guild_id or not channel_id:
     print(Fore.RED + "GAGAL: GUILD_ID atau CHANNEL_ID belum disetting di Environment Variables Render!")
