@@ -80,23 +80,26 @@ def start_bot(token, index):
             # --- FITUR AUTO REPLY ---
             # Jika ada pesan baru masuk di server
             if t == "MESSAGE_CREATE" and d is not None:
-                content = d.get("content", "").lower()
-                embeds = d.get("embeds", [])
-                msg_channel_id = d.get("channel_id")
+                msg_channel_id = str(d.get("channel_id"))
                 
-                # Gabungkan teks biasa dengan teks di dalam embed (kotak pesan bot)
-                full_text = content
-                for embed in embeds:
-                    full_text += " " + embed.get("description", "").lower()
-                    full_text += " " + embed.get("title", "").lower()
-                
-                # Deteksi jika pesan berisi kata kunci AFK Check
-                keywords = ["hey wake up", "confirm by saying `yes`", "are you still here"]
-                if any(keyword in full_text for keyword in keywords):
-                    print(Fore.YELLOW + f"[Token {index+1}] Peringatan AFK dari bot terdeteksi!")
-                    # Gunakan thread agar koneksi utama websocket tidak terhambat
-                    time.sleep(2) # Beri jeda 2 detik agar terlihat lebih natural (seperti manusia mengetik)
-                    threading.Thread(target=send_chat_reply, args=(msg_channel_id, "yes"), daemon=True).start()
+                # SYARAT BARU: Hanya proses jika pesan ada di dalam Channel yang dimasuki bot
+                if msg_channel_id == str(channel_id):
+                    content = d.get("content", "").lower()
+                    embeds = d.get("embeds", [])
+                    
+                    # Gabungkan teks biasa dengan teks di dalam embed (kotak pesan bot)
+                    full_text = content
+                    for embed in embeds:
+                        full_text += " " + embed.get("description", "").lower()
+                        full_text += " " + embed.get("title", "").lower()
+                    
+                    # Deteksi jika pesan berisi kata kunci AFK Check
+                    keywords = ["hey wake up", "confirm by saying `yes`", "are you still here"]
+                    if any(keyword in full_text for keyword in keywords):
+                        print(Fore.YELLOW + f"[Token {index+1}] Peringatan AFK di channel ini terdeteksi!")
+                        # Jeda 2 detik agar natural
+                        time.sleep(2) 
+                        threading.Thread(target=send_chat_reply, args=(msg_channel_id, "yes"), daemon=True).start()
 
             # --- KONEKSI WEBSOCKET ---
             if op == 10:  
