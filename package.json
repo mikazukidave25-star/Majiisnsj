@@ -1,0 +1,13 @@
+{
+  "name": "discord-rpc-render",
+  "version": "1.0.0",
+  "description": "Multi Token Discord RPC for Render",
+  "main": "rpc.js",
+  "type": "module",
+  "scripts": {
+    "start": "node rpc.js"
+  },
+  "dependencies": {
+    "discord.js-selfbot-v13": "^3.4.3"
+  }
+}
