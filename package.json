@@ -8,6 +8,7 @@
     "start": "node rpc.js"
   },
   "dependencies": {
-    "discord.js-selfbot-v13": "^3.4.3"
+    "discord.js-selfbot-v13": "^3.4.3",
+    "debug": "^4.3.4"
   }
 }
