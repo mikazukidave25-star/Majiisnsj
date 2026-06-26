@@ -1,6 +1,15 @@
 import fs from "fs"
 import { Client, RichPresence } from "discord.js-selfbot-v13"
 
+// --- SISTEM ANTI CRASH ---
+// Mencegah script mati jika ada error jaringan dari Discord
+process.on('unhandledRejection', (error) => {
+    console.log('[RPC] Peringatan/Error jaringan (Aman diabaikan):', error.message);
+});
+process.on('uncaughtException', (error) => {
+    console.log('[RPC] Error tidak terduga:', error.message);
+});
+
 // Baca token dari file
 let tokens = [];
 try {
@@ -28,13 +37,18 @@ tokens.forEach((token, index) => {
                 .setName("Nyawit 24/7")
                 .setDetails("Maul CEO Nyawit")
                 .setStartTimestamp(Date.now())
-                .setAssetsLargeImage("1312264004382621706")
+                .setAssetsLargeImage("1312264004382621706") 
                 .addButton("YouTube", "https://youtube.com/watch?v=KeCuLeKQC0c")
 
             client.user.setPresence({
                 activities: [rpc]
             })
         })
+        
+        // Tangkap error per-token agar tidak menular
+        client.on("error", (err) => {
+            console.log(`[RPC] Token ${index + 1} mengalami error koneksi.`);
+        });
 
         client.login(token).catch(() => {
             console.log(`[RPC] Token ke-${index + 1} invalid / gagal login`)
