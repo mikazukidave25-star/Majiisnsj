@@ -36,7 +36,7 @@ tokens.forEach((token, index) => {
                 .setType("PLAYING")
                 .setName("Nyawit 24/7")
                 .setDetails("Maul CEO Nyawit")
-                .setStartTimestamp(new Date("2026-06-25T00:00:00Z").getTime())
+                .setStartTimestamp(new Date("2026-01-25T00:00:00Z").getTime())
                 .setAssetsLargeImage("1312264004382621706") 
                 .addButton("YouTube", "https://youtube.com/watch?v=KeCuLeKQC0c")
 
