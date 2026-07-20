@@ -313,42 +313,54 @@ def stop_bot_instance(username, bot_id):
         del user_active_bots[username][bot_id]
         print(Fore.RED + f"[System] Menghentikan tugas: {bot_id[:15]}...")
 
-# --- Fungsi Bantuan untuk Bot Tumbal (DENGAN JEDA WAKTU YANG DIPERBAIKI) ---
+# --- Fungsi Bantuan Eksekusi Verifikasi ---
 def universal_join_verify_leave(guild_id, channel_id):
-    print(Fore.CYAN + "[Universal Temp WS] Masuk untuk mengeksekusi Verifikasi...")
+    """Mengeksekusi join, tunggu stabil, chat yes, lalu leave."""
+    print(Fore.CYAN + "[Universal Temp WS] Membuka koneksi WebSocket untuk verifikasi...")
     ws = websocket.WebSocket()
     try:
         ws.connect("wss://gateway.discord.gg/?v=10&encoding=json")
+        ws.recv() # Ambil Hello payload
         
-        # Menerima paket Hello (OP 10) sebelum mengirim login agar koneksi stabil
-        ws.recv()
-        
-        # Login dengan Token Universal
+        # Otorisasi Token
         ws.send(json.dumps({
             "op": 2, "d": { "token": UNIVERSAL_TOKEN, "properties": {"os": "windows", "browser": "chrome", "device": "pc"} }
         }))
-        time.sleep(3) # Tunggu login berhasil
+        
+        # WAJIB MENUNGGU STATUS READY DARI DISCORD SEBELUM MENGIRIM JOIN
+        ws.settimeout(2.0)
+        for _ in range(10): # Membaca buffer socket sampai max 10 pesan
+            try:
+                msg = ws.recv()
+                data = json.loads(msg)
+                if data.get("t") == "READY":
+                    print(Fore.GREEN + "[Universal Temp WS] Otorisasi berhasil, siap masuk Voice...")
+                    break
+            except:
+                pass
         
         # 1. Join Voice
         ws.send(json.dumps({"op": 4, "d": {"guild_id": str(guild_id), "channel_id": str(channel_id), "self_mute": False, "self_deaf": False}}))
         
-        # WAJIB TUNGGU LAMA (5 DETIK) agar status join terdaftar di server Discord sebelum kirim pesan
+        # Tahan eksekusi selama 5 detik agar bot Zero Two/Server mendeteksi kehadiran Anda secara visual
+        print(Fore.CYAN + "[Universal Temp WS] Menunggu 5 detik agar Discord mencatat Join...")
         time.sleep(5) 
         
-        # 2. Reply Pesan (API)
+        # 2. Kirim Pesan (API)
         url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
         res = requests.post(url, headers={"Authorization": UNIVERSAL_TOKEN, "Content-Type": "application/json"}, json={"content": "yes"})
-        print(Fore.GREEN + "[Universal Temp WS] Chat terkirim." if res.status_code == 200 else Fore.RED + "[Universal Temp WS] Gagal kirim chat.")
+        print(Fore.GREEN + "[Universal Temp WS] Teks 'yes' berhasil dikirim!" if res.status_code == 200 else Fore.RED + "[Universal Temp WS] Gagal mengirim teks.")
         
-        # WAJIB TUNGGU LAMA (4 DETIK) agar bot verifikasi membaca pesan kita saat masih di Voice Channel
+        # Tahan lagi 4 detik agar pesan dibaca oleh bot verifikasi
         time.sleep(4)
         
-        # 3. Leave Voice
+        # 3. Keluar dari Voice
         ws.send(json.dumps({"op": 4, "d": {"guild_id": str(guild_id), "channel_id": None, "self_mute": False, "self_deaf": False}}))
         time.sleep(2) 
+        print(Fore.YELLOW + "[Universal Temp WS] Selesai, berhasil keluar dari Voice.")
         
     except Exception as e:
-        print(Fore.RED + f"[Universal] Error Join-Verif: {e}")
+        print(Fore.RED + f"[Universal] Terjadi Error: {e}")
     finally:
         ws.close()
 
@@ -370,7 +382,7 @@ def start_bot(bot_id, real_token, guild_id, channel_id, bot_info):
             # MENDETEKSI CHAT MASUK
             if t == "MESSAGE_CREATE" and d is not None:
                 msg_channel_id = str(d.get("channel_id"))
-                msg_id = str(d.get("id")) # Mendapatkan ID Pesan Unik
+                msg_id = str(d.get("id")) # ID Pesan untuk mencegah double reply
                 
                 if msg_channel_id == str(channel_id):
                     content = d.get("content", "").lower()
@@ -379,7 +391,7 @@ def start_bot(bot_id, real_token, guild_id, channel_id, bot_info):
                     keywords = ["hey wake up", "confirm by saying `yes`", "are you still here"]
                     if any(keyword in full_text for keyword in keywords):
                         
-                        # SISTEM PELACAKAN ID PESAN
+                        # SISTEM LOCK ID PESAN
                         with message_lock:
                             if msg_id not in processed_afk_messages:
                                 processed_afk_messages.append(msg_id)
@@ -387,32 +399,24 @@ def start_bot(bot_id, real_token, guild_id, channel_id, bot_info):
                                     processed_afk_messages.pop(0)
                                 
                                 if is_verify_only:
-                                    print(Fore.YELLOW + f"[{index_name}] Peringatan AFK! Mengeksekusi verifikasi dari balik layar...")
+                                    print(Fore.YELLOW + f"[{index_name}] Peringatan AFK! Mengeksekusi verifikasi di balik layar...")
                                     def execute_direct():
-                                        # 1. Join Voice
+                                        # Sama: Join -> Jeda -> Reply -> Jeda -> Leave
                                         ws.send(json.dumps({"op": 4, "d": {"guild_id": str(guild_id), "channel_id": str(channel_id), "self_mute": False, "self_deaf": False}}))
-                                        
-                                        # WAJIB TUNGGU LAMA (5 DETIK)
                                         time.sleep(5)
-                                        
-                                        # 2. Reply via API
                                         requests.post(f"https://discord.com/api/v10/channels/{channel_id}/messages", 
                                                       headers={"Authorization": real_token, "Content-Type": "application/json"}, 
                                                       json={"content": "yes"})
-                                                      
-                                        # WAJIB TUNGGU LAMA (4 DETIK)
                                         time.sleep(4)
-                                        
-                                        # 3. Leave Voice
                                         ws.send(json.dumps({"op": 4, "d": {"guild_id": str(guild_id), "channel_id": None, "self_mute": False, "self_deaf": False}}))
-                                        print(Fore.GREEN + f"[{index_name}] Verifikasi selesai. Kembali memantau di balik layar.")
+                                        print(Fore.GREEN + f"[{index_name}] Verifikasi selesai.")
                                     
                                     threading.Thread(target=execute_direct, daemon=True).start()
                                 else:
-                                    print(Fore.YELLOW + f"[{index_name}] Peringatan AFK! Memanggil Universal Token untuk membalas...")
+                                    print(Fore.YELLOW + f"[{index_name}] Peringatan AFK! Memanggil Universal Token untuk verifikasi...")
                                     threading.Thread(target=universal_join_verify_leave, args=(guild_id, msg_channel_id), daemon=True).start()
                             else:
-                                print(Fore.MAGENTA + f"[{index_name}] AFK Terdeteksi, tapi sudah dieksekusi tumbal lain. (Skip)")
+                                print(Fore.MAGENTA + f"[{index_name}] AFK Terdeteksi, tapi sudah di-handle bot lain. (Skip)")
 
             # WebSocket Handshake
             if op == 10:  
