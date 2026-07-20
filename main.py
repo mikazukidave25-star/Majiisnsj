@@ -16,7 +16,7 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "kunci_rahasia_bebas_apa_saj
 
 # --- TOKEN UNIVERSAL ---
 # Masukkan Token Universal Anda di sini (Akun ini yang akan Join -> Verif Yes -> Leave)
-UNIVERSAL_TOKEN = "ISI_TOKEN_UNIVERSAL_DI_SINI"
+UNIVERSAL_TOKEN = "NjU4MTk5NjgwOTA3MjE0ODY4.GpOUyx.P-MQmA0HIMv71C4cFSXbWLS9UNVGca5mftA678"
 
 # Database sederhana di memori untuk menyimpan akun web
 USERS_DB = {
