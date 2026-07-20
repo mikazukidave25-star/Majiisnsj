@@ -16,11 +16,11 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "kunci_rahasia_bebas_apa_saj
 
 # --- TOKEN UNIVERSAL ---
 # Masukkan Token Universal Anda di sini (Akun ini yang akan Join -> Verif Yes -> Leave)
-UNIVERSAL_TOKEN = "NjU4MTk5NjgwOTA3MjE0ODY4.GpOUyx.P-MQmA0HIMv71C4cFSXbWLS9UNVGca5mftA678"
+UNIVERSAL_TOKEN = "ISI_TOKEN_UNIVERSAL_DI_SINI"
 
 # Database sederhana di memori untuk menyimpan akun web
 USERS_DB = {
-    "admin": "admin123"  
+    "admin": "admin123"  # Akun bawaan default
 }
 
 # Kamus untuk menyimpan data bot aktif per User
@@ -84,6 +84,8 @@ HTML_TEMPLATE = """
             <input type="password" name="password" required>
             <button type="submit">Masuk</button>
         </form>
+        <!-- LINK DAFTAR DIKEMBALIKAN -->
+        <p style="text-align: center; margin-top: 15px;">Belum punya akun? <a href="/register" style="color: #89b4fa;">Daftar di sini</a></p>
     </div>
 
     {% elif page == 'register' %}
@@ -97,6 +99,8 @@ HTML_TEMPLATE = """
             <input type="password" name="password" required>
             <button type="submit" style="background: #89b4fa;">Daftar</button>
         </form>
+        <!-- LINK LOGIN DIKEMBALIKAN -->
+        <p style="text-align: center; margin-top: 15px;">Sudah punya akun? <a href="/login" style="color: #89b4fa;">Login di sini</a></p>
     </div>
 
     {% elif page == 'dashboard' %}
