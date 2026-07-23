@@ -2,3 +2,4 @@ websocket-client
 colorama
 Flask
 requests
+discord.py==1.7.3
