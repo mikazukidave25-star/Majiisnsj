@@ -12,7 +12,7 @@ import base64
 YESCAPTCHA_CLIENT_KEY = "4833cd9be06f143f76fc531a5312404bbdb09dc0100535"
 
 # ⚠️ UBAH BAGIAN INI: MASUKKAN ID CHANNEL DISCORD KAMU! ⚠️
-channel_id = "1293476303789494304" 
+channel_id = "1521808183096508456" 
 
 init(autoreset=True)
 start_dt = datetime.now()
